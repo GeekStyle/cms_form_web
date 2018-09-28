@@ -1,0 +1,22 @@
+.rowStyle {
+  padding: 10px 10px 10px 20px;
+}
+.cellStyle{
+  text-align: left
+}
+/* body{
+  overflow-y: auto !important
+} */
+.crew-hotel,
+.upload-img {
+  margin: 15px 0; 
+}
+.crew-thumb {
+  margin: 8px 0;
+}
+.btn-copy {
+  margin-left: 10px;
+}
+.btn-add-image {
+  float: right;
+}

@@ -1,0 +1,58 @@
+clone:
+  git:
+    image: plugins/git
+    skip_verify: true
+pipeline:
+  build:
+    image: registry.pm.bwoilmarine.com/bmo/drone-node:9.3.0 
+    commands:
+      - /npm_init
+      - yarn install  --production=false
+      - CI="" yarn build
+      - npm publish 
+  scp:
+    image: registry.pm.bwoilmarine.com/bmo/drone-scp:1.0.0
+    host: svr.pm.bwoilmarine.com
+    port: 22
+    username: bwoil
+    target: /home/bwoil/storybook/pkg/${DRONE_REPO_NAME}
+    rm: true    
+    secrets: [ ssh_password ]
+    source:
+      - .pkgnamefull
+      - ./stories/*
+      - package.json
+  ssh:
+    image: registry.pm.bwoilmarine.com/bmo/drone-ssh:1.0.0
+    host: svr.pm.bwoilmarine.com
+    username: bwoil
+    port: 22
+    secrets: [ ssh_password ]
+    script:
+      - BMOPKGNAME=$(cat /home/bwoil/storybook/pkg/${DRONE_REPO_NAME}/.pkgnamefull | sed 's/@.*//' )
+      - sh /home/bwoil/storybook/replacePkg.sh ${DRONE_REPO_NAME} $BMOPKGNAME
+      - cd /home/bwoil/storybook/
+      - echo "docker-compose down" > "pkg/${DRONE_REPO_NAME}.sh"
+      - echo "chmod 755 /home/bwoil/storybook/pkg/${DRONE_REPO_NAME}/*" >> "pkg/${DRONE_REPO_NAME}.sh"
+      - echo "rm -rf /home/bwoil/storybook/code/storybook/stories/${DRONE_REPO_NAME}" >> "pkg/${DRONE_REPO_NAME}.sh"
+      - echo "cp -r  /home/bwoil/storybook/pkg/${DRONE_REPO_NAME}  /home/bwoil/storybook/code/storybook/stories/" >> "pkg/${DRONE_REPO_NAME}.sh"
+      - echo "./yarnInstall.sh $(</home/bwoil/storybook/pkg/${DRONE_REPO_NAME}/.pkgnamefull) > log/${DRONE_REPO_NAME}.log" >> "pkg/${DRONE_REPO_NAME}.sh"
+      - echo "docker-compose up -d" >> "pkg/${DRONE_REPO_NAME}.sh"
+      - chmod 755 "pkg/${DRONE_REPO_NAME}.sh"      
+      - nohup "pkg/${DRONE_REPO_NAME}.sh" > /dev/null 2>&1 &    
+  notify:
+    image: registry.pm.bwoilmarine.com/bmo/drone-email:1.0.1
+    recipients: [ yang.shen@bwoil.com]
+    recipients_only: true
+    subject: >
+      [{{ build.status }}]
+      {{ repo.owner }}/{{ repo.name }}
+      ({{ build.branch }} - {{ truncate build.commit 8 }})
+    body: >
+      {{#success build.status}}
+        {{ build.author }}Job finished successfully.
+      {{else}}
+        {{ build.author }} broke the build.
+      {{/success}} 
+    when:
+      status: [ success, failure ]     
